@@ -2,7 +2,6 @@ services:
   - type: web
     name: vath-api
     runtime: node
-    rootDir: server
     buildCommand: cd server && npm install
     startCommand: cd server && node index.js
     envVars:
