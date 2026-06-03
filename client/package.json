@@ -1,0 +1,41 @@
+{
+  "name": "vath-client",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.0.0",
+    "@react-three/fiber": "^9.0.4",
+    "@supabase/supabase-js": "^2.49.0",
+    "@tailwindcss/vite": "^4.0.7",
+    "@types/three": "^0.173.0",
+    "lucide-react": "^1.17.0",
+    "motion": "^12.4.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-responsive": "^10.0.0",
+    "react-router-dom": "^7.1.0",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^3.0.1",
+    "tailwindcss": "^4.0.7",
+    "three": "^0.173.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.19.0",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.18",
+    "globals": "^15.14.0",
+    "vite": "^6.1.0"
+  }
+}
