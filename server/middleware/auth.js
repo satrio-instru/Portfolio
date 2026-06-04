@@ -18,13 +18,13 @@ export async function authMiddleware(req, res, next) {
   try {
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !user) {
-      console.warn("Auth failed:", error?.message || "user not found");
+      console.warn("Auth failed:", JSON.stringify({ message: error?.message, status: error?.status, code: error?.code }));
       return res.status(401).json({ error: "Token tidak valid atau sudah kedaluwarsa." });
     }
     req.user = user;
     next();
   } catch (err) {
-    console.error("Auth exception:", err.message);
+    console.error("Auth exception:", err.message, err.code);
     return res.status(401).json({ error: "Gagal memverifikasi token." });
   }
 }
