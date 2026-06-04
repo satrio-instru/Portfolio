@@ -59,8 +59,12 @@ const shiftTemplates = {
   },
 };
 
-const defaultAiPrompt =
-  "Anda adalah senior workforce analytics auditor. Analisa data access-log dan shift dalam Bahasa Indonesia. Fokus pada keterlambatan, pulang cepat, lembur, keluar-masuk selama shift, anomali human error, vulnerability operasional, dan rekomendasi audit yang bisa ditindaklanjuti. Jangan mengarang di luar data JSON.";
+export const defaultAiPrompt =
+  "Anda adalah senior workforce analytics auditor. Analisa data access-log dan shift dalam Bahasa Indonesia. " +
+  "Output harus mencakup: (1) Ringkasan eksekutif 2-3 kalimat, (2) Temuan utama per kategori (keterlambatan, pulang cepat, lembur, keluar-masuk, anomali), " +
+  "(3) Top 5 risiko tertinggi dengan data pendukung, (4) Rekomendasi audit yang spesifik dan bisa ditindaklanjuti, " +
+  "(5) Pola visualisasi yang terlihat (tren, hotspot waktu, konsentrasi departemen). " +
+  "Format output: markdown dengan heading, bullet points, dan tabel ringkas. Jangan mengarang di luar data JSON.";
 
 export async function ensureStorage() {
   await fs.mkdir(datasetsRoot, { recursive: true });
@@ -100,10 +104,10 @@ export async function saveAiConfig(input = {}) {
   return publicAiConfig(next);
 }
 
-export async function runDatasetAiAnalysis(id) {
+export async function runDatasetAiAnalysis(id, userId) {
   const analysisPath = path.join(datasetsRoot, id, "analysis.json");
   const analysis = await loadAnalysis(id, { includeInternal: true });
-  const enhanced = await enhanceWithExternalAi(analysis, { requireExternal: true });
+  const enhanced = await enhanceWithExternalAi(analysis, { requireExternal: true, userId });
   if (enhanced.ai?.externalAiError) {
     const error = new Error(`AI eksternal gagal: ${enhanced.ai.externalAiError}`);
     error.status = 502;
@@ -1546,7 +1550,9 @@ function buildLocalAiNarrative(summary, anomalies, schema) {
 }
 
 async function enhanceWithExternalAi(analysis, options = {}) {
-  const config = await loadAiConfig({ includeSecret: true });
+  const config = options.userId
+    ? await loadDbAiConfig(options.userId)
+    : await loadAiConfig({ includeSecret: true });
   if (!config.enabled || !config.apiKey || config.provider === "local") {
     if (options.requireExternal) {
       const error = new Error("AI eksternal belum aktif atau API key belum tersimpan di AI Config.");
@@ -1808,10 +1814,31 @@ async function loadAiConfig({ includeSecret = false } = {}) {
   }
 }
 
+async function loadDbAiConfig(userId) {
+  try {
+    const { dbGetAiConfig } = await import("./db.js");
+    const config = await dbGetAiConfig(userId);
+    if (!config) return { enabled: false, apiKey: "", provider: "local" };
+    return {
+      enabled: config.enabled,
+      provider: config.provider,
+      compatibility: config.compatibility,
+      model: config.model,
+      baseUrl: config.base_url,
+      apiKey: config.api_key,
+      maxTokens: config.max_tokens,
+      anthropicVersion: config.anthropic_version,
+      prompt: config.prompt,
+    };
+  } catch {
+    return { enabled: false, apiKey: "", provider: "local" };
+  }
+}
+
 function withAiConfigDefaults(config) {
   const provider = String(config.provider || "local").toLowerCase();
   const compatibility = String(config.compatibility || "anthropic").toLowerCase();
-  // Prefer env var for API key (security: never store in file)
+  // Saved API key takes precedence; env var is fallback only
   const envKey = process.env[`${provider.toUpperCase()}_API_KEY`] || "";
   return {
     enabled: Boolean(config.enabled),
@@ -1822,7 +1849,7 @@ function withAiConfigDefaults(config) {
     anthropicVersion: String(config.anthropicVersion || "2023-06-01"),
     maxTokens: Number(config.maxTokens || 4000),
     prompt: String(config.prompt || defaultAiPrompt),
-    apiKey: envKey || String(config.apiKey || ""),
+    apiKey: String(config.apiKey || "") || envKey,
     updatedAt: config.updatedAt || "",
   };
 }
