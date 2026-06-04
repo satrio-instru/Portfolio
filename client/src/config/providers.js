@@ -37,7 +37,7 @@ export function toDraftConfig(config) {
     model: config?.model ?? "",
     baseUrl: config?.baseUrl ?? "",
     apiKey: config?.apiKey ?? "",
-    maxTokens: config?.maxTokens ?? 1600,
+    maxTokens: config?.maxTokens ?? 4000,
     anthropicVersion: config?.anthropicVersion ?? "2023-06-01",
     prompt: config?.prompt ?? defaultAiPrompt,
   };

@@ -1597,7 +1597,7 @@ async function enhanceWithAnthropicCompatible(analysis, config, source) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: Number(config.maxTokens || 1600),
+        max_tokens: Number(config.maxTokens || 4000),
         system: config.prompt || defaultAiPrompt,
         messages: [
           {
@@ -1652,7 +1652,7 @@ async function enhanceWithOpenAiCompatible(analysis, config, source) {
       body: JSON.stringify({
         model,
         temperature: 0.2,
-        max_tokens: Number(config.maxTokens || 1600),
+        max_tokens: Number(config.maxTokens || 4000),
         messages: [
           {
             role: "system",
@@ -1779,10 +1779,23 @@ function buildExternalAiPrompt(analysis) {
 }
 
 function extractAnthropicText(body) {
-  return body.content
-    ?.map((part) => ("text" in part ? part.text : ""))
+  // Prefer text parts; fall back to thinking parts if no text (MiMo extended thinking)
+  const textParts = body.content
+    ?.filter((part) => part.type === "text")
+    .map((part) => part.text)
     .join("\n")
     .trim();
+
+  if (textParts) return textParts;
+
+  // Fallback: extract from thinking parts
+  const thinkingParts = body.content
+    ?.filter((part) => part.type === "thinking")
+    .map((part) => part.thinking)
+    .join("\n")
+    .trim();
+
+  return thinkingParts || "";
 }
 
 async function loadAiConfig({ includeSecret = false } = {}) {
