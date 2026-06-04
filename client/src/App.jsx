@@ -70,6 +70,7 @@ function DashboardWrapper() {
 
 function InputWrapper() {
   const { api } = useApi();
+  const { session } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [datasets, setDatasets] = useState([]);
