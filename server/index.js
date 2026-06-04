@@ -18,6 +18,15 @@ const port = Number(process.env.PORT || 4174);
 
 await ensureStorage();
 
+// Log configuration status at startup
+console.log("─".repeat(50));
+console.log("VATh API Configuration:");
+console.log(`  PORT: ${port}`);
+console.log(`  CORS_ORIGIN: ${process.env.CORS_ORIGIN || "http://localhost:5173"}`);
+console.log(`  SUPABASE_URL: ${process.env.SUPABASE_URL ? "✅ set" : "❌ NOT SET"}`);
+console.log(`  SUPABASE_SERVICE_KEY: ${process.env.SUPABASE_SERVICE_KEY ? "✅ set" : "❌ NOT SET"}`);
+console.log("─".repeat(50));
+
 const app = express();
 
 // CORS
