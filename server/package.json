@@ -8,6 +8,7 @@
     "ingest": "node ingest.js"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^149.0.0",
     "@supabase/supabase-js": "^2.49.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",

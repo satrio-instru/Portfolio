@@ -1,4 +1,5 @@
 import puppeteer from "puppeteer";
+import chromium from "@sparticuz/chromium";
 
 function formatNumber(n) {
   if (n == null) return "0";
@@ -157,8 +158,9 @@ export async function generateVisualizationPdf(dataset) {
 
 async function htmlToPdf(html) {
   const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    headless: chromium.headless,
+    executablePath: await chromium.executablePath(),
+    args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   });
   try {
     const page = await browser.newPage();

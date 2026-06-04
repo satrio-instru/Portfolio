@@ -255,10 +255,31 @@ router.get("/datasets/:id/employees/:employeeKey", async (req, res, next) => {
   }
 });
 
+// ── Helper: reconstruct analysis object from DB row ──────────────────
+function rowToAnalysis(row) {
+  return {
+    metadata: row.metadata,
+    schema: row.schema_info,
+    summary: row.summary,
+    charts: row.charts,
+    anomalies: row.anomalies,
+    employeeReports: row.employee_reports,
+    shiftSessions: row.shift_sessions,
+    vulnerabilitySummary: row.vulnerability_summary,
+    ai: row.ai,
+    recordsSample: row.records,
+    algorithms: row.algorithms,
+    shiftConfig: row.shift_config,
+    anomalyLimit: row.anomaly_limit,
+  };
+}
+
 // ── Local analysis ───────────────────────────────────────────────────
 router.post("/datasets/:id/analyze-local", async (req, res, next) => {
   try {
-    const analysis = await runLocalAnalysis(req.params.id);
+    const row = await dbGetDataset(req.user.id, req.params.id);
+    const existing = rowToAnalysis(row);
+    const analysis = await runLocalAnalysis(req.params.id, existing);
     await dbSaveDataset(req.user.id, analysis);
     await dbLog(req.user.id, "analyze_local", `Local analysis completed for ${req.params.id}`);
     res.json({ dataset: analysis });
@@ -271,7 +292,9 @@ router.post("/datasets/:id/analyze-local", async (req, res, next) => {
 router.post("/datasets/:id/analyze", async (req, res, next) => {
   try {
     await dbLog(req.user.id, "analyze_ai_start", "Starting AI analysis...");
-    const analysis = await runDatasetAiAnalysis(req.params.id, req.user.id);
+    const row = await dbGetDataset(req.user.id, req.params.id);
+    const existing = rowToAnalysis(row);
+    const analysis = await runDatasetAiAnalysis(req.params.id, req.user.id, existing);
     await dbSaveDataset(req.user.id, analysis);
     await dbLog(req.user.id, "analyze_ai_done", `AI analysis completed: ${analysis.ai?.source || "local"}`);
     res.json({ dataset: analysis });

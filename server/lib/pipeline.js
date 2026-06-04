@@ -104,25 +104,31 @@ export async function saveAiConfig(input = {}) {
   return publicAiConfig(next);
 }
 
-export async function runDatasetAiAnalysis(id, userId) {
-  const analysisPath = path.join(datasetsRoot, id, "analysis.json");
-  const analysis = await loadAnalysis(id, { includeInternal: true });
+export async function runDatasetAiAnalysis(id, userId, existingAnalysis = null) {
+  const analysis = existingAnalysis || await loadAnalysis(id, { includeInternal: true });
   const enhanced = await enhanceWithExternalAi(analysis, { requireExternal: true, userId });
   if (enhanced.ai?.externalAiError) {
     const error = new Error(`AI eksternal gagal: ${enhanced.ai.externalAiError}`);
     error.status = 502;
     throw error;
   }
-  await fs.writeFile(analysisPath, JSON.stringify(enhanced, null, 2), "utf8");
+  // Save to file system if available
+  try {
+    const analysisPath = path.join(datasetsRoot, id, "analysis.json");
+    await fs.writeFile(analysisPath, JSON.stringify(enhanced, null, 2), "utf8");
+  } catch {}
   return redactInternalPaths(enhanced);
 }
 
-export async function runLocalAnalysis(id) {
-  const analysisPath = path.join(datasetsRoot, id, "analysis.json");
-  const analysis = await loadAnalysis(id, { includeInternal: true });
+export async function runLocalAnalysis(id, existingAnalysis = null) {
+  const analysis = existingAnalysis || await loadAnalysis(id, { includeInternal: true });
   const localNarrative = buildLocalAiNarrative(analysis.summary, analysis.anomalies, analysis.schema);
   analysis.ai = localNarrative;
-  await fs.writeFile(analysisPath, JSON.stringify(analysis, null, 2), "utf8");
+  // Save to file system if available
+  try {
+    const analysisPath = path.join(datasetsRoot, id, "analysis.json");
+    await fs.writeFile(analysisPath, JSON.stringify(analysis, null, 2), "utf8");
+  } catch {}
   return redactInternalPaths(analysis);
 }
 
