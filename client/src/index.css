@@ -1377,7 +1377,6 @@ td span {
 /* === Download Card Active State === */
 .download-card.active {
   border-color: rgba(120, 242, 165, 0.5);
-}
   background: rgba(120, 242, 165, 0.08);
 }
 
