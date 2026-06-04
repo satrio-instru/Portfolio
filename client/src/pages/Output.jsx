@@ -7,9 +7,9 @@ import {
 import { BarChart3, Clock, Database, Download, PieChart as PieIcon, ShieldAlert } from "lucide-react";
 import { formatNumber, truncate } from "../utils/format";
 import { palette } from "../config/palette";
-import { API_BASE } from "../config/api";
+import { UPLOAD_URL } from "../config/api";
 
-export default function OutputPage({ dataset }) {
+export default function OutputPage({ dataset, onExportPdf }) {
   const dailyEvents = useMemo(() => dataset.charts.dailyEvents || [], [dataset.charts.dailyEvents]);
   const eventThresholdDefault = useMemo(() => {
     const values = dailyEvents.map((item) => Number(item.events) || 0).filter(Boolean);
@@ -87,10 +87,28 @@ export default function OutputPage({ dataset }) {
             <p className="eyebrow">Anomaly workbench</p>
             <h3>Baris yang perlu dicek</h3>
           </div>
-          <a className="ghost-button" href={`${API_BASE}/datasets/${dataset.metadata.id}/anomalies.csv`}>
-            <Download size={16} />
-            CSV
-          </a>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="ghost-button" onClick={onExportPdf}>
+              <Download size={16} /> PDF
+            </button>
+            <button className="ghost-button" onClick={async () => {
+              try {
+                const { supabase } = await import("../config/supabase");
+                const { data: { session } } = await supabase.auth.getSession();
+                const token = session?.access_token || "";
+                const res = await fetch(`${UPLOAD_URL}/datasets/${dataset.metadata.id}/anomalies.csv`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!res.ok) throw new Error("Gagal download");
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a"); a.href = url; a.download = `anomalies-${dataset.metadata.id}.csv`; a.click();
+                URL.revokeObjectURL(url);
+              } catch (e) { console.error(e); }
+            }}>
+              <Download size={16} /> CSV
+            </button>
+          </div>
         </div>
         <AnomalyTable anomalies={dataset.anomalies || []} />
       </section>
