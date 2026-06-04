@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "node:path";
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import {
   getTempRoot,
   getAnomaliesCsv,
@@ -35,6 +36,109 @@ const upload = multer({
   },
 });
 
+// ── Chunked upload state ────────────────────────────────────────────
+const chunkUploads = new Map(); // uploadId → { dir, originalName, chunks }
+
+function cleanupUpload(uploadId) {
+  const entry = chunkUploads.get(uploadId);
+  if (entry) {
+    fs.rm(entry.dir, { recursive: true, force: true }).catch(() => {});
+    chunkUploads.delete(uploadId);
+  }
+}
+
+// ── Chunked upload: init ─────────────────────────────────────────────
+router.post("/datasets/upload-init", async (req, res, next) => {
+  try {
+    const { originalName, totalChunks } = req.body;
+    if (!originalName || !totalChunks) {
+      return res.status(400).json({ error: "originalName dan totalChunks wajib diisi." });
+    }
+    const allowed = [".xls", ".xlsx", ".csv", ".tsv"];
+    const ext = path.extname(originalName).toLowerCase();
+    if (!allowed.includes(ext)) {
+      return res.status(400).json({ error: "File harus berupa .xls, .xlsx, .csv, atau .tsv." });
+    }
+
+    const uploadId = crypto.randomUUID();
+    const dir = path.join(getTempRoot(), `chunked-${uploadId}`);
+    await fs.mkdir(dir, { recursive: true });
+
+    chunkUploads.set(uploadId, { dir, originalName, chunks: new Map(), totalChunks });
+
+    // Auto-cleanup after 10 minutes
+    setTimeout(() => cleanupUpload(uploadId), 10 * 60 * 1000);
+
+    res.json({ uploadId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Chunked upload: receive chunk ────────────────────────────────────
+router.put("/datasets/upload-chunk/:uploadId", upload.single("chunk"), async (req, res, next) => {
+  try {
+    const entry = chunkUploads.get(req.params.uploadId);
+    if (!entry) return res.status(404).json({ error: "Upload session tidak ditemukan." });
+
+    const index = Number(req.body.index);
+    if (isNaN(index) || !req.file) {
+      return res.status(400).json({ error: "index dan chunk file wajib." });
+    }
+
+    // Move chunk to persistent location
+    const chunkPath = path.join(entry.dir, `chunk-${index}`);
+    await fs.rename(req.file.path, chunkPath);
+    entry.chunks.set(index, chunkPath);
+
+    res.json({ received: index, total: entry.totalChunks });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Chunked upload: assemble & process ───────────────────────────────
+router.post("/datasets/upload-complete/:uploadId", async (req, res, next) => {
+  try {
+    const entry = chunkUploads.get(req.params.uploadId);
+    if (!entry) return res.status(404).json({ error: "Upload session tidak ditemukan." });
+
+    if (entry.chunks.size !== entry.totalChunks) {
+      return res.status(400).json({
+        error: `Chunk belum lengkap: ${entry.chunks.size}/${entry.totalChunks}`,
+      });
+    }
+
+    // Assemble chunks into single file
+    const ext = path.extname(entry.originalName).toLowerCase();
+    const assembledPath = path.join(entry.dir, `assembled${ext}`);
+    const writeStream = (await import("node:fs")).createWriteStream(assembledPath);
+
+    for (let i = 0; i < entry.totalChunks; i++) {
+      const chunkData = await fs.readFile(entry.chunks.get(i));
+      writeStream.write(chunkData);
+    }
+    writeStream.end();
+
+    await new Promise((resolve, reject) => {
+      writeStream.on("finish", resolve);
+      writeStream.on("error", reject);
+    });
+
+    // Process the assembled file
+    const analysis = await processAndStoreFile(assembledPath, entry.originalName);
+
+    // Cleanup
+    cleanupUpload(req.params.uploadId);
+
+    res.status(201).json({ dataset: analysis });
+  } catch (error) {
+    cleanupUpload(req.params.uploadId);
+    next(error);
+  }
+});
+
+// ── Standard single-file upload ──────────────────────────────────────
 router.get("/datasets", async (_req, res, next) => {
   try {
     res.json({ datasets: await listDatasets() });

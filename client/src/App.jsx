@@ -120,24 +120,79 @@ function InputWrapper() {
     if (!file) return;
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append("file", file);
-
-      // Use direct upload URL to bypass Vercel proxy size limits
-      const headers = {};
+      const authHeaders = {};
       if (session?.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`;
+        authHeaders["Authorization"] = `Bearer ${session.access_token}`;
       }
-      const response = await fetch(`${UPLOAD_URL}/datasets`, {
-        method: "POST",
-        body: form,
-        headers,
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Upload gagal (${response.status})`);
+
+      let result;
+
+      // Use chunked upload for files > 4MB to bypass proxy limits
+      const CHUNK_THRESHOLD = 4 * 1024 * 1024; // 4MB
+      const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
+
+      if (file.size > CHUNK_THRESHOLD) {
+        // ── Chunked upload ──
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+        // Init upload session
+        const initRes = await fetch(`${UPLOAD_URL}/datasets/upload-init`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          body: JSON.stringify({ originalName: file.name, totalChunks }),
+        });
+        if (!initRes.ok) {
+          const body = await initRes.json().catch(() => ({}));
+          throw new Error(body.error || "Gagal memulai upload.");
+        }
+        const { uploadId } = await initRes.json();
+
+        // Upload each chunk
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
+
+          const chunkForm = new FormData();
+          chunkForm.append("chunk", chunk, `chunk-${i}`);
+          chunkForm.append("index", String(i));
+
+          const chunkRes = await fetch(`${UPLOAD_URL}/datasets/upload-chunk/${uploadId}`, {
+            method: "PUT",
+            headers: authHeaders,
+            body: chunkForm,
+          });
+          if (!chunkRes.ok) {
+            const body = await chunkRes.json().catch(() => ({}));
+            throw new Error(body.error || `Gagal upload chunk ${i + 1}/${totalChunks}.`);
+          }
+        }
+
+        // Complete upload
+        const completeRes = await fetch(`${UPLOAD_URL}/datasets/upload-complete/${uploadId}`, {
+          method: "POST",
+          headers: authHeaders,
+        });
+        if (!completeRes.ok) {
+          const body = await completeRes.json().catch(() => ({}));
+          throw new Error(body.error || "Gagal menyelesaikan upload.");
+        }
+        result = await completeRes.json();
+      } else {
+        // ── Direct upload for small files ──
+        const form = new FormData();
+        form.append("file", file);
+        const response = await fetch(`${UPLOAD_URL}/datasets`, {
+          method: "POST",
+          headers: authHeaders,
+          body: form,
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || `Upload gagal (${response.status})`);
+        }
+        result = await response.json();
       }
-      const result = await response.json();
 
       await refreshDatasets();
       await openDataset(result.dataset.metadata.id);
