@@ -1820,7 +1820,7 @@ function withAiConfigDefaults(config) {
     model: String(config.model || defaultModelFor(provider, compatibility)),
     baseUrl: String(config.baseUrl || defaultBaseUrlFor(provider, compatibility)),
     anthropicVersion: String(config.anthropicVersion || "2023-06-01"),
-    maxTokens: Number(config.maxTokens || 1600),
+    maxTokens: Number(config.maxTokens || 4000),
     prompt: String(config.prompt || defaultAiPrompt),
     apiKey: envKey || String(config.apiKey || ""),
     updatedAt: config.updatedAt || "",
