@@ -1,4 +1,5 @@
 export const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+export const UPLOAD_URL = import.meta.env.VITE_UPLOAD_URL || API_BASE;
 
 export async function api(pathName, options = {}) {
   const response = await fetch(`${API_BASE}${pathName}`, options);

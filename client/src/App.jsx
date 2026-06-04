@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useToast } from "./context/ToastContext";
 import { useApi } from "./hooks/useApi";
+import { UPLOAD_URL } from "./config/api";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
@@ -121,7 +122,23 @@ function InputWrapper() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const result = await api("/datasets", { method: "POST", body: form });
+
+      // Use direct upload URL to bypass Vercel proxy size limits
+      const headers = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+      const response = await fetch(`${UPLOAD_URL}/datasets`, {
+        method: "POST",
+        body: form,
+        headers,
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Upload gagal (${response.status})`);
+      }
+      const result = await response.json();
+
       await refreshDatasets();
       await openDataset(result.dataset.metadata.id);
       showToast("File berhasil diupload!", "success");
@@ -284,7 +301,8 @@ function EmployeeDetailWrapper() {
       const { supabase } = await import("./config/supabase");
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token || "";
-      const response = await fetch(`${import.meta.env.VITE_API_BASE || "/api"}/export/pdf/${datasetId}/${encodeURIComponent(employeeKey)}`, {
+      // Use direct URL to bypass Vercel proxy timeout for PDF generation
+      const response = await fetch(`${UPLOAD_URL}/export/pdf/${datasetId}/${encodeURIComponent(employeeKey)}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
