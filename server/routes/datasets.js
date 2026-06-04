@@ -75,8 +75,10 @@ router.post("/datasets/upload-init", async (req, res, next) => {
   }
 });
 
-// ── Chunked upload: receive chunk ────────────────────────────────────
-router.put("/datasets/upload-chunk/:uploadId", upload.single("chunk"), async (req, res, next) => {
+// ── Chunked upload: receive chunk (no file filter — chunks are raw binary) ──
+const chunkUpload = multer({ dest: getTempRoot() });
+
+router.put("/datasets/upload-chunk/:uploadId", chunkUpload.single("chunk"), async (req, res, next) => {
   try {
     const entry = chunkUploads.get(req.params.uploadId);
     if (!entry) return res.status(404).json({ error: "Upload session tidak ditemukan." });
