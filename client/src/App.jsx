@@ -148,7 +148,7 @@ function InputWrapper() {
         }
         const { uploadId } = await initRes.json();
 
-        // Upload each chunk
+        // Upload each chunk (NO Content-Type header — browser sets it with boundary)
         for (let i = 0; i < totalChunks; i++) {
           const start = i * CHUNK_SIZE;
           const end = Math.min(start + CHUNK_SIZE, file.size);
@@ -160,7 +160,7 @@ function InputWrapper() {
 
           const chunkRes = await fetch(`${UPLOAD_URL}/datasets/upload-chunk/${uploadId}`, {
             method: "PUT",
-            headers: authHeaders,
+            headers: { Authorization: authHeaders.Authorization },
             body: chunkForm,
           });
           if (!chunkRes.ok) {
@@ -172,7 +172,7 @@ function InputWrapper() {
         // Complete upload
         const completeRes = await fetch(`${UPLOAD_URL}/datasets/upload-complete/${uploadId}`, {
           method: "POST",
-          headers: authHeaders,
+          headers: { Authorization: authHeaders.Authorization },
         });
         if (!completeRes.ok) {
           const body = await completeRes.json().catch(() => ({}));
